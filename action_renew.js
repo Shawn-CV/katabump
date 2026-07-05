@@ -462,28 +462,47 @@ async function attemptTurnstileCdp(page) {
                     // B. 处理 ALTCHA 验证码 (Katabump 已从 Turnstile 换成 ALTCHA)
                     console.log('正在检查 ALTCHA 验证码...');
                     let altchaSuccess = false;
+                    let altchaClicked = false;
                     for (let findAttempt = 0; findAttempt < 15; findAttempt++) {
                         try {
-                            const altchaCheckbox = modal.getByRole('checkbox', { name: "I'm not a robot" });
-                            if (await altchaCheckbox.isVisible({ timeout: 1000 })) {
-                                console.log('   >> 找到 ALTCHA 复选框。点击中...');
-                                await altchaCheckbox.click();
-                                await page.waitForTimeout(2000);
-                                const verifiedCheckbox = modal.getByRole('checkbox', { name: 'Verified' });
-                                if (await verifiedCheckbox.isVisible({ timeout: 3000 })) {
-                                    console.log('   >> ALTCHA 验证成功！');
-                                    altchaSuccess = true;
-                                    break;
-                                }
-                                if (await altchaCheckbox.isChecked()) {
-                                    console.log('   >> ALTCHA 复选框已勾选！');
-                                    altchaSuccess = true;
-                                    break;
+                            if (!altchaClicked) {
+                                const altchaCheckbox = modal.getByRole('checkbox', { name: "I'm not a robot" });
+                                if (await altchaCheckbox.isVisible({ timeout: 1000 })) {
+                                    console.log('   >> 找到 ALTCHA 复选框。点击中...');
+                                    await altchaCheckbox.click();
+                                    altchaClicked = true;
+                                    await page.waitForTimeout(3000);
                                 }
                             }
+                            // 检查是否验证成功 (多种方式)
+                            // 1. 检查 "Verified" 文字
+                            const verifiedCheckbox = modal.getByRole('checkbox', { name: 'Verified' });
+                            if (await verifiedCheckbox.isVisible({ timeout: 1000 })) {
+                                console.log('   >> ALTCHA 验证成功 (Verified)！');
+                                altchaSuccess = true;
+                                break;
+                            }
+                            // 2. 检查任意 checkbox 是否已 checked
+                            const anyCheckbox = modal.getByRole('checkbox').first();
+                            if (await anyCheckbox.isChecked()) {
+                                console.log('   >> ALTCHA 复选框已勾选！');
+                                altchaSuccess = true;
+                                break;
+                            }
+                            // 3. 检查是否有 "Verified" 文字出现
+                            const verifiedText = modal.getByText('Verified', { exact: false });
+                            if (await verifiedText.isVisible({ timeout: 500 })) {
+                                console.log('   >> ALTCHA 验证成功 (文本)！');
+                                altchaSuccess = true;
+                                break;
+                            }
                         } catch (e) { }
-                        console.log(`   >> [寻找尝试 ${findAttempt + 1}/15] 尚未找到 ALTCHA 复选框...`);
-                        await page.waitForTimeout(1000);
+                        if (!altchaClicked) {
+                            console.log(`   >> [寻找尝试 ${findAttempt + 1}/15] 尚未找到 ALTCHA 复选框...`);
+                        } else {
+                            console.log(`   >> [等待验证 ${findAttempt + 1}/15] 等待 ALTCHA 验证完成...`);
+                        }
+                        await page.waitForTimeout(2000);
                     }
 
                     if (!altchaSuccess) {
