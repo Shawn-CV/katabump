@@ -413,6 +413,34 @@ async function attemptTurnstileCdp(page) {
                     }
                 } catch (e) { }
 
+                // 等待登录完成 (页面跳转到 dashboard)
+                console.log('   >> 等待登录完成...');
+                for (let waitSec = 0; waitSec < 15; waitSec++) {
+                    await page.waitForTimeout(1000);
+                    const currentUrl = page.url();
+                    if (currentUrl.includes('dashboard') && !currentUrl.includes('auth/login')) {
+                        console.log('   >> 登录成功，已进入 Dashboard。');
+                        break;
+                    }
+                    // 检查是否有 ALTCHA 验证码需要处理
+                    try {
+                        const altchaCheckbox = page.getByRole('checkbox', { name: "I'm not a robot" });
+                        if (await altchaCheckbox.isVisible({ timeout: 500 })) {
+                            console.log('   >> 登录页面发现 ALTCHA 验证码，点击中...');
+                            await altchaCheckbox.click();
+                            await page.waitForTimeout(3000);
+                            // 再次点击 Login
+                            try {
+                                const loginBtn = page.getByRole('button', { name: 'Login', exact: true });
+                                if (await loginBtn.isVisible({ timeout: 1000 })) {
+                                    await loginBtn.click();
+                                }
+                            } catch (e2) { }
+                        }
+                    } catch (e2) { }
+                    if (waitSec === 14) console.log('   >> 登录等待超时，当前 URL: ' + page.url());
+                }
+
             } catch (e) {
                 console.log('登录错误:', e.message);
             }
